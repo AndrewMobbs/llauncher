@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -264,19 +263,26 @@ func main() {
 			break
 		}
 	}
-	log.Printf("Loading configuration from: %s", configFile)
+	if debugMode {
+		fmt.Printf("Loading configuration from: %s\n", configFile)
+	}
 
 	// 2. Read and parse the YAML configuration file.
 	config, err := loadConfig(configFile)
 	if err != nil {
-		log.Printf("Failed to load configuration: %v", err)
+		if debugMode {
+			fmt.Printf("Failed to load configuration: %v\n", err)
+		}
 		showHelp()
 	}
 
 	// 3. Build the command-line arguments for llama-server using reflection.
 	args, err := buildArgs(config)
 	if err != nil {
-		log.Fatalf("Failed to build arguments: %v", err)
+		if debugMode {
+			fmt.Printf("Failed to build arguments: %v\n", err)
+		}
+		os.Exit(1)
 	}
 	
 	// In debug mode, print the full command that will be executed
@@ -286,8 +292,6 @@ func main() {
 		fmt.Println("Full command that will be executed:")
 		fmt.Printf("llama-server %s\n", formatArgsForDisplay(args))
 		fmt.Println("=================\n")
-	} else {
-		log.Printf("Starting llama-server with arguments: %v", args)
 	}
 
 	// 4. Set up the command to execute llama-server.
@@ -304,7 +308,9 @@ func main() {
 
 	go func() {
 		sig := <-sigChan
-		log.Printf("Received signal: %v. Forwarding to llama-server...", sig)
+		if debugMode {
+			fmt.Printf("Received signal: %v. Forwarding to llama-server...\n", sig)
+		}
 		if cmd.Process != nil {
 			cmd.Process.Signal(sig)
 		}
@@ -317,14 +323,21 @@ func main() {
 	if err != nil {
 		if exitError, ok := err.(*exec.ExitError); ok {
 			waitStatus := exitError.Sys().(syscall.WaitStatus)
-			log.Printf("llama-server exited with status: %d", waitStatus.ExitStatus())
+			if debugMode {
+				fmt.Printf("llama-server exited with status: %d\n", waitStatus.ExitStatus())
+			}
 			os.Exit(waitStatus.ExitStatus())
 		} else {
-			log.Fatalf("Failed to run llama-server: %v", err)
+			if debugMode {
+				fmt.Printf("Failed to run llama-server: %v\n", err)
+			}
+			os.Exit(1)
 		}
 	}
 
-	log.Println("llama-server exited successfully.")
+	if debugMode {
+		fmt.Println("llama-server exited successfully.")
+	}
 }
 
 // loadConfig reads a YAML file and unmarshals it into a LlamaConfig struct.

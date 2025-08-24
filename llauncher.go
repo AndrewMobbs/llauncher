@@ -9,7 +9,9 @@ import (
 	"os/signal"
 	"reflect"
 	"strconv"
+	"strings"
 	"syscall"
+	"unicode"
 
 	"gopkg.in/yaml.v3"
 )
@@ -173,10 +175,11 @@ type LlamaConfig struct {
 func showHelp() {
 	fmt.Println("llauncher - A launcher for llama-server")
 	fmt.Println("\nUsage:")
-	fmt.Println("  llauncher [--config <config_file>] [--help]")
+	fmt.Println("  llauncher [--config <config_file>] [--help] [--debug]")
 	fmt.Println("\nOptions:")
 	fmt.Println("  --config <file>    Path to YAML configuration file")
 	fmt.Println("  --help             Show this help message")
+	fmt.Println("  --debug            Print debug information including the full command")
 	fmt.Println("\nEnvironment Variables:")
 	fmt.Println("  LLAMA_CONFIG_PATH  Path to YAML configuration file (overridden by --config)")
 	fmt.Println("\nConfiguration File Format (YAML):")
@@ -239,6 +242,15 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "--help" {
 		showHelp()
 	}
+	
+	// Check if debug mode is enabled
+	debugMode := false
+	for _, arg := range os.Args {
+		if arg == "--debug" {
+			debugMode = true
+			break
+		}
+	}
 
 	// 1. Determine the configuration file path.
 	// Priority: --config flag > LLAMA_CONFIG_PATH env var > default path.
@@ -246,8 +258,11 @@ func main() {
 	if val, ok := os.LookupEnv("LLAMA_CONFIG_PATH"); ok {
 		configFile = val
 	}
-	if len(os.Args) > 2 && os.Args[1] == "--config" {
-		configFile = os.Args[2]
+	for i := 1; i < len(os.Args)-1; i++ {
+		if os.Args[i] == "--config" {
+			configFile = os.Args[i+1]
+			break
+		}
 	}
 	log.Printf("Loading configuration from: %s", configFile)
 
@@ -263,7 +278,17 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to build arguments: %v", err)
 	}
-	log.Printf("Starting llama-server with arguments: %v", args)
+	
+	// In debug mode, print the full command that will be executed
+	if debugMode {
+		fmt.Println("\n=== DEBUG MODE ===")
+		fmt.Printf("Configuration file: %s\n", configFile)
+		fmt.Println("Full command that will be executed:")
+		fmt.Printf("llama-server %s\n", formatArgsForDisplay(args))
+		fmt.Println("=================\n")
+	} else {
+		log.Printf("Starting llama-server with arguments: %v", args)
+	}
 
 	// 4. Set up the command to execute llama-server.
 	// Assumes 'llama-server' is in the PATH.
@@ -366,5 +391,36 @@ func buildArgs(config *LlamaConfig) ([]string, error) {
 	}
 
 	return args, nil
+}
+
+// formatArgsForDisplay formats the arguments array for better readability
+func formatArgsForDisplay(args []string) string {
+	var result string
+	for i, arg := range args {
+		// Add quotes around arguments that contain spaces
+		if containsSpace(arg) {
+			arg = "\"" + arg + "\""
+		}
+		
+		// Add a newline and indentation for each flag (arguments starting with --)
+		if i > 0 && strings.HasPrefix(arg, "--") {
+			result += " \\\n    "
+		} else if i > 0 {
+			result += " "
+		}
+		
+		result += arg
+	}
+	return result
+}
+
+// containsSpace checks if a string contains any whitespace
+func containsSpace(s string) bool {
+	for _, r := range s {
+		if unicode.IsSpace(r) {
+			return true
+		}
+	}
+	return false
 }
 

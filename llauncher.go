@@ -34,7 +34,41 @@ type LlamaConfig struct {
 	Numa           string   `yaml:"numa" arg:"--numa"`
 }
 
+// showHelp displays usage information for the launcher
+func showHelp() {
+	fmt.Println("llauncher - A launcher for llama-server")
+	fmt.Println("\nUsage:")
+	fmt.Println("  llauncher [--config <config_file>] [--help]")
+	fmt.Println("\nOptions:")
+	fmt.Println("  --config <file>    Path to YAML configuration file")
+	fmt.Println("  --help             Show this help message")
+	fmt.Println("\nEnvironment Variables:")
+	fmt.Println("  LLAMA_CONFIG_PATH  Path to YAML configuration file (overridden by --config)")
+	fmt.Println("\nConfiguration File Format (YAML):")
+	fmt.Println("  model: path/to/model.gguf       # Path to the model file")
+	fmt.Println("  host: 127.0.0.1                 # Host to bind to")
+	fmt.Println("  port: 8080                      # Port to listen on")
+	fmt.Println("  threads: 4                      # Number of threads to use")
+	fmt.Println("  threads-batch: 4                # Number of batch threads")
+	fmt.Println("  n-ctx: 2048                     # Context size")
+	fmt.Println("  n-gpu-layers: 0                 # Number of GPU layers")
+	fmt.Println("  lora:                           # LoRA adapters")
+	fmt.Println("    - adapter1.bin")
+	fmt.Println("    - adapter2.bin")
+	fmt.Println("  verbose: true                   # Enable verbose output")
+	fmt.Println("  cont-batching: true             # Enable continuous batching")
+	fmt.Println("  metrics: false                  # Enable metrics")
+	fmt.Println("  slot-save-path: ./slots         # Path to save slots")
+	fmt.Println("  numa: 0                         # NUMA node")
+	os.Exit(0)
+}
+
 func main() {
+	// Check if help is requested
+	if len(os.Args) > 1 && os.Args[1] == "--help" {
+		showHelp()
+	}
+
 	// 1. Determine the configuration file path.
 	// Priority: --config flag > LLAMA_CONFIG_PATH env var > default path.
 	configFile := "./config.yaml" // Default path
@@ -49,7 +83,8 @@ func main() {
 	// 2. Read and parse the YAML configuration file.
 	config, err := loadConfig(configFile)
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		log.Printf("Failed to load configuration: %v", err)
+		showHelp()
 	}
 
 	// 3. Build the command-line arguments for llama-server using reflection.

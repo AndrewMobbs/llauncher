@@ -229,7 +229,7 @@ func showHelp() {
 	fmt.Println("  api-key: secret                 # API key for authentication")
 	fmt.Println("  ssl-key-file: key.pem           # SSL key file")
 	fmt.Println("  ssl-cert-file: cert.pem         # SSL certificate file")
-	fmt.Println("")
+	fmt.Print("\n")
 	fmt.Println("  # Logging")
 	fmt.Println("  verbose: true                   # Enable verbose output")
 	fmt.Println("  log-file: server.log            # Log to file")

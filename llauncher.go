@@ -291,7 +291,7 @@ func main() {
 		fmt.Printf("Configuration file: %s\n", configFile)
 		fmt.Println("Full command that will be executed:")
 		fmt.Printf("llama-server %s\n", formatArgsForDisplay(args))
-		fmt.Println("=================\n")
+		fmt.Println("=================")
 	}
 
 	// 4. Set up the command to execute llama-server.

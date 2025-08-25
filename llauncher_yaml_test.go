@@ -105,7 +105,8 @@ rope-scale: 1.5
 model: /path/to/model.gguf
 lora:
 - adapter1.bin
-  - adapter2.bin  # This line has incorrect indentation
+    - invalid: structure  # This creates invalid YAML structure
+      that: will fail
 `,
 			wantErr: true,
 			validate: func(c *LlamaConfig) bool {

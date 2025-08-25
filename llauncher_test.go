@@ -124,7 +124,7 @@ func TestBuildArgs(t *testing.T) {
 			config: &LlamaConfig{
 				// All fields are zero values
 			},
-			want:    []string{},
+			want:    nil,
 			wantErr: false,
 		},
 		{

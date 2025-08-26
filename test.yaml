@@ -1,0 +1,16 @@
+model: /var/lib/models/gpt-oss-120b.gguf
+alias: GPT-OSS-120b
+port: 9000
+ctx-size: 131072
+jinja: true
+cache-type-k: q8_0
+cache-type-v: q8_0
+n-gpu-layers: 99
+n-cpu-moe: 36
+flash-attn: true
+chat-template-kwargs: |-
+  '{"reasoning_effort": "high"}'
+top-p: 1.00
+min-p: 0.05
+temp: 1.0
+top-k: 40

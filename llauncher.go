@@ -68,7 +68,7 @@ type LlamaConfig struct {
 
 	// Memory management
 	ContextSize     int    `yaml:"ctx-size" arg:"--ctx-size"`
-	FlashAttn       bool   `yaml:"flash-attn" atg:"--flash-attn"`
+	FlashAttn       bool   `yaml:"flash-attn" arg:"--flash-attn"`
 	Mlock           bool   `yaml:"mlock" arg:"--mlock"`
 	NoMMap          bool   `yaml:"no-mmap" arg:"--no-mmap"`
 	CacheTypeK      string `yaml:"cache-type-k" arg:"--cache-type-k"`
@@ -385,6 +385,8 @@ func buildArgs(config *LlamaConfig) ([]string, error) {
 			args = append(args, argTag, field.String())
 		case reflect.Int:
 			args = append(args, argTag, strconv.FormatInt(field.Int(), 10))
+		case reflect.Float64:
+			args = append(args, argTag, fmt.Sprintf("%g", field.Float()))
 		case reflect.Slice:
 			// For slices (like --lora), add the flag for each item.
 			if field.Type().Elem().Kind() == reflect.String {

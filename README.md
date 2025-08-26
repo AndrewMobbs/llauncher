@@ -8,8 +8,8 @@ In general, the format of the YAML file is simply the longest version of the opt
 
 All llama-server options should be supported as of 20250825 - but this is likely to degrade over time.
 
-<details>
-<summary>Example YAML Config</summary>
+
+## Example YAML Config
 ```yaml
 model: /var/lib/models/gpt-oss-120b.gguf
 alias: GPT-OSS-120b
@@ -28,4 +28,3 @@ min-p: 0.05
 temp: 1.0
 top-k: 40
 ```
-</details>

@@ -14,6 +14,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// execCommand is a wrapper around exec.Command that can be swapped out in tests.
+// By default it points at the real exec.Command implementation.
+var execCommand = exec.Command
+
 // LlamaConfig defines the structure of the YAML configuration file.
 // The `yaml` struct tags map YAML keys to the struct fields.
 // The `arg` struct tags define the corresponding command-line flag, which is
@@ -287,7 +291,8 @@ func main() {
 
 	// 4. Set up the command to execute llama-server.
 	// Assumes 'llama-server' is in the PATH.
-	cmd := exec.Command("llama-server", args...)
+	// Use the injectable execCommand so tests can replace it.
+	cmd := execCommand("llama-server", args...)
 
 	// 5. Connect stdout and stderr of the child process to the parent.
 	cmd.Stdout = os.Stdout

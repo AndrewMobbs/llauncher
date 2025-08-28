@@ -49,13 +49,40 @@ func TestHelperProcess(t *testing.T) {
 	}
 }
 
-// TestMainWithMock tests the main function with a mocked exec.Command
-func TestMainWithMock(t *testing.T) {
-	// Skip this test for now as it requires more complex setup
-	// In a real implementation, we would:
-	// 1. Save the original exec.Command
-	// 2. Replace it with our mockExecCommand
-	// 3. Run main() in a goroutine
-	// 4. Restore the original exec.Command
-	t.Skip("Mock testing requires more complex setup")
-}
+ // TestMainWithMock tests the main function with a mocked exec.Command.
+ // It verifies that `main` runs to completion without invoking the real
+ // “llama‑server” binary.
+ func TestMainWithMock(t *testing.T) {
+	 // -----------------------------------------------------------------
+	 // 1️⃣  Save the original execCommand and restore it after the test.
+	 // -----------------------------------------------------------------
+	 origExecCommand := execCommand
+	 defer func() { execCommand = origExecCommand }()
+
+	 // -----------------------------------------------------------------
+	 // 2️⃣  Replace execCommand with the mock implementation.
+	 // -----------------------------------------------------------------
+	 execCommand = mockExecCommand
+
+	 // -----------------------------------------------------------------
+	 // 3️⃣  Create a minimal temporary config file.
+	 // -----------------------------------------------------------------
+	 const yaml = "model: /tmp/dummy.gguf\n"
+	 cfgFile := createTempFile(t, yaml)
+	 defer os.Remove(cfgFile)
+
+	 // -----------------------------------------------------------------
+	 // 4️⃣  Set up the command‑line arguments for the test run.
+	 // -----------------------------------------------------------------
+	 oldArgs := os.Args
+	 defer func() { os.Args = oldArgs }()
+	 os.Args = []string{"llauncher", "--config", cfgFile}
+
+	 // -----------------------------------------------------------------
+	 // 5️⃣  Run main().  The mock will cause the spawned “llama‑server”
+	 //    process to exit immediately with status 0, so main should return
+	 //    without calling os.Exit or panicking.
+	 // -----------------------------------------------------------------
+	 main()
+	 // If we reach this point the test succeeded.
+ }

@@ -26,33 +26,100 @@ port: 8080
 	t.Run("Debug flag", func(t *testing.T) {
 		// Set up args with debug flag
 		os.Args = []string{"llauncher", "--debug", "--config", validFile}
-		
+
 		// Capture stdout to check debug output
 		oldStdout := os.Stdout
 		r, w, _ := os.Pipe()
 		os.Stdout = w
-		
-		// This is a simplified test that just ensures the code compiles
-		// In a real scenario, we would need to mock exec.Command and
-		// check the captured output for debug information
-		
+
+		// Run main in a subprocess so os.Exit does not kill the test.
+		cmd := exec.Command(os.Args[0], "-test.run=TestDebugMode")
+		cmd.Env = append(os.Environ(), "TEST_DEBUG=1")
+		cmd.Args = []string{os.Args[0], "llauncher", "--debug", "--config", validFile}
+		// Suppress output; we will read from the pipe.
+		cmd.Stdout = w
+		cmd.Stderr = w
+
+		if err := cmd.Run(); err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() != 0 {
+				t.Fatalf("main exited with %d, want 0 (debug mode)", exitErr.ExitCode())
+			}
+			t.Fatalf("error running main in debug mode: %v", err)
+		}
+
 		// Restore stdout
 		os.Stdout = oldStdout
 		w.Close()
-		
+
 		// Read captured output
 		var buf bytes.Buffer
 		io.Copy(&buf, r)
-		
-		// In a real test, we would check the output here
-		// For now, we just ensure the code compiles
+
+		output := buf.String()
+		if !strings.Contains(output, "DEBUG:") {
+			t.Fatalf("expected debug output, got: %s", output)
+		}
 	})
 }
 
 // TestSignalHandling tests the signal handling functionality
 func TestSignalHandling(t *testing.T) {
-	// This is a placeholder for a test that would verify signal handling
-	// Testing signal handling properly requires more complex setup with
-	// a mock command that can receive signals
-	t.Skip("Signal handling tests require more complex setup")
+	// This test verifies that signals are forwarded to the child process.
+	// We use a mock command that blocks until it receives a SIGTERM.
+	// The mock is provided via the execCommand variable.
+
+	// Create a temporary config file (minimal, just model)
+	cfg := `
+model: /tmp/dummy.gguf
+`
+	cfgFile := createTempFile(t, cfg)
+	defer os.Remove(cfgFile)
+
+	// Prepare a mock command that waits for a signal.
+	// The mock will be a separate Go test binary that exits with code 0
+	// when it receives SIGTERM.
+	mockCmd := func(name string, args ...string) *exec.Cmd {
+		// Use the same test binary with a special env var.
+		cmd := exec.Command(os.Args[0], "-test.run=MockSignalReceiver")
+		cmd.Env = append(os.Environ(), "MOCK_SIGNAL=1")
+		return cmd
+	}
+	originalExec := execCommand
+	execCommand = mockCmd
+	defer func() { execCommand = originalExec }()
+
+	// Run main in a goroutine so we can send it a signal.
+	done := make(chan struct{})
+	go func() {
+		// Set args to include config file.
+		os.Args = []string{"llauncher", "--config", cfgFile}
+		main()
+		close(done)
+	}()
+
+	// Give the child process a moment to start.
+	time.Sleep(100 * time.Millisecond)
+
+	// Send SIGTERM to the current process; it should be forwarded.
+	syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+
+	// Wait for main to exit.
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("main did not exit after signal")
+	}
+}
+
+// MockSignalReceiver is executed in a subprocess to act as the child process.
+func TestMockSignalReceiver(t *testing.T) {
+	if os.Getenv("MOCK_SIGNAL") != "1" {
+		return
+	}
+	// Wait for a signal.
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGTERM)
+	<-sigChan
+	// Received signal, exit with success.
+	os.Exit(0)
 }

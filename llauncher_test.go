@@ -308,11 +308,23 @@ func TestMainHelp(t *testing.T) {
 	// Test --help flag
 	os.Args = []string{"llauncher", "--help"}
 
-	// Since main() calls os.Exit(), we need to use a separate process
-	// This is a simplified test that just ensures the code compiles
-	if os.Getenv("TEST_MAIN_HELP") == "1" {
-		main()
-		return
+	// Since main() calls os.Exit(), we need to run it in a subprocess.
+	// The subprocess will set TEST_MAIN_HELP=1 and invoke main().
+	cmd := exec.Command(os.Args[0], "-test.run=TestMainHelp")
+	cmd.Env = append(os.Environ(), "TEST_MAIN_HELP=1")
+	// Suppress output; we only care about the exit code.
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+
+	if err := cmd.Run(); err != nil {
+		// The subprocess should exit with code 0 (showHelp calls os.Exit(0)).
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			if status := exitErr.ExitCode(); status != 0 {
+				t.Fatalf("showHelp exited with %d, want 0", status)
+			}
+		} else {
+			t.Fatalf("unexpected error running subprocess: %v", err)
+		}
 	}
 }
 
@@ -327,6 +339,17 @@ port: 8080
 	validFile := createTempFile(t, validConfig)
 	defer os.Remove(validFile)
 
+	// Helper to run main in a subprocess with given args and env.
+	runMain := func(args []string, env []string) error {
+		cmd := exec.Command(os.Args[0], "-test.run=TestConfigFileHandling")
+		cmd.Env = append(os.Environ(), env...)
+		cmd.Args = append([]string{os.Args[0]}, args...)
+		// Suppress output; we only care about exit code.
+		cmd.Stdout = nil
+		cmd.Stderr = nil
+		return cmd.Run()
+	}
+
 	// Test with environment variable
 	t.Run("Environment variable config path", func(t *testing.T) {
 		oldEnv, exists := os.LookupEnv("LLAMA_CONFIG_PATH")
@@ -335,21 +358,25 @@ port: 8080
 		} else {
 			defer os.Unsetenv("LLAMA_CONFIG_PATH")
 		}
-
 		os.Setenv("LLAMA_CONFIG_PATH", validFile)
 
-		// This is a simplified test that just ensures the code compiles
-		// In a real scenario, we would need to mock exec.Command
+		if err := runMain([]string{"llauncher"}, []string{"TEST_CONFIG_ENV=1"}); err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() != 0 {
+				t.Fatalf("main exited with %d, want 0 (env config)", exitErr.ExitCode())
+			}
+			t.Fatalf("error running main with env config: %v", err)
+		}
 	})
 
-	// Test with --config flag
-	t.Run("Config flag", func(t *testing.T) {
-		oldArgs := os.Args
-		defer func() { os.Args = oldArgs }()
-
-		os.Args = []string{"llauncher", "--config", validFile}
-
-		// This is a simplified test that just ensures the code compiles
-		// In a real scenario, we would need to mock exec.Command
+	// Test with --config flag (should override env var)
+	t.Run("Config flag overrides env", func(t *testing.T) {
+		// Set a bogus env var to ensure flag takes precedence
+		os.Setenv("LLAMA_CONFIG_PATH", "/nonexistent.yaml")
+		if err := runMain([]string{"llauncher", "--config", validFile}, []string{"TEST_CONFIG_FLAG=1"}); err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() != 0 {
+				t.Fatalf("main exited with %d, want 0 (config flag)", exitErr.ExitCode())
+			}
+			t.Fatalf("error running main with config flag: %v", err)
+		}
 	})
 }

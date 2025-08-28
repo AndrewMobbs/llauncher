@@ -69,7 +69,7 @@ threads: "four"  # Should be a number
 			name: "YAML with boolean values",
 			yaml: `
 model: /path/to/model.gguf
-verbose: true
+log-verbose: true
 mlock: yes  # Alternative way to specify true
 no-mmap: false
 metrics: no  # Alternative way to specify false
@@ -167,7 +167,7 @@ threads-http: 8
 # Performance configuration
 threads: 4
 threads-batch: 8
-n-ctx: 2048
+ctx-size: 2048
 batch-size: 512
 n-gpu-layers: 0
 device: cpu

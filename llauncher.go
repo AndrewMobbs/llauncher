@@ -386,8 +386,10 @@ func resolveConfigPath() string {
 				 fmt.Printf("Received signal: %v. Forwarding to llama-server (pgid %d)...\n", sig, cmd.Process.Pid)
 			 }
 			 // Forward to the whole process group. Negative PID means “process group”.
-			 if err := syscall.Kill(-cmd.Process.Pid, sig.(syscall.Signal)); err != nil && debug {
-				 fmt.Printf("Failed to forward signal %v: %v\n", sig, err)
+			 if cmd.Process != nil {
+				 if err := syscall.Kill(-cmd.Process.Pid, sig.(syscall.Signal)); err != nil && debug {
+					 fmt.Printf("Failed to forward signal %v: %v\n", sig, err)
+				 }
 			 }
 		 }
 	 }()

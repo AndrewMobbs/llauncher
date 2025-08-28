@@ -38,9 +38,7 @@ port: 8080
 		os.Stdout = w
 
 		// Run main in a subprocess so os.Exit does not kill the test.
-		cmd := exec.Command(os.Args[0], "-test.run=TestDebugMode")
-		cmd.Env = append(os.Environ(), "TEST_DEBUG=1")
-		cmd.Args = []string{os.Args[0], "llauncher", "--debug", "--config", validFile}
+		cmd := exec.Command("llauncher", "--debug", "--config", validFile)
 		// Suppress output; we will read from the pipe.
 		cmd.Stdout = w
 		cmd.Stderr = w

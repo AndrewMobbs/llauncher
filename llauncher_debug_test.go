@@ -4,7 +4,12 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"strings"
 	"testing"
+	"time"
+	"syscall"
+	"os/exec"
+	"os/signal"
 )
 
 // TestDebugMode tests the --debug flag functionality

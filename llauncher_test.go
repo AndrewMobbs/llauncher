@@ -4,6 +4,8 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"strings"
+	"os/exec"
 )
 
 // TestLoadConfig tests the loadConfig function with various inputs

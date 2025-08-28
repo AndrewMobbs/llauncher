@@ -79,6 +79,22 @@ func TestHelperProcess(t *testing.T) {
 	 os.Args = []string{"llauncher", "--config", cfgFile}
 
 	 // -----------------------------------------------------------------
+	 // 5️⃣  Suppress any output that `main()` (or the code it calls) writes
+	 //     to stdout / stderr.  This keeps the test runner silent while
+	 //     preserving the existing behaviour and coverage.
+	 // -----------------------------------------------------------------
+	 devNull, _ := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	 origStdout := os.Stdout
+	 origStderr := os.Stderr
+	 os.Stdout = devNull
+	 os.Stderr = devNull
+	 defer func() {
+	 	os.Stdout = origStdout
+	 	os.Stderr = origStderr
+	 	_ = devNull.Close()
+	 }()
+
+	 // -----------------------------------------------------------------
 	 // 5️⃣  Run main().  The mock will cause the spawned “llama‑server”
 	 //    process to exit immediately with status 0, so main should return
 	 //    without calling os.Exit or panicking.

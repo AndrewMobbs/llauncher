@@ -109,18 +109,18 @@ func TestBuildArgs(t *testing.T) {
 				Verbose:      true,
 			},
 			want: []string{
-				"--model", "/path/to/model.gguf",
 				"--host", "0.0.0.0",
 				"--port", "8080",
+				"--model", "/path/to/model.gguf",
 				"--threads", "4",
 				"--lora", "adapter1.bin",
 				"--lora", "adapter2.bin",
-				"--verbose",
+				"--log-verbose",
 			},
 			wantErr: false,
 		},
 		{
-			name: "Empty config",
+			name:   "Empty config",
 			config: &LlamaConfig{
 				// All fields are zero values
 			},
@@ -141,19 +141,19 @@ func TestBuildArgs(t *testing.T) {
 				"--model", "/path/to/model.gguf",
 				"--mlock",
 				"--cont-batching",
-				"--verbose",
+				"--log-verbose",
 			},
 			wantErr: false,
 		},
 		{
 			name: "Config with numeric values",
 			config: &LlamaConfig{
-				ModelPath:     "/path/to/model.gguf",
-				Threads:       4,
-				ThreadsBatch:  8,
-				ContextSize:   2048,
-				// Remove floating point values that are causing errors
-				TopK:          40,
+				ModelPath:    "/path/to/model.gguf",
+				Threads:      4,
+				ThreadsBatch: 8,
+				ContextSize:  2048,
+				TopK:         40,
+				TopP:         0.95,
 			},
 			want: []string{
 				"--model", "/path/to/model.gguf",
@@ -161,6 +161,7 @@ func TestBuildArgs(t *testing.T) {
 				"--threads-batch", "8",
 				"--ctx-size", "2048",
 				"--top-k", "40",
+				"--top-p", "0.95",
 			},
 			wantErr: false,
 		},
@@ -275,15 +276,15 @@ func createTempFile(t *testing.T, content string) string {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	
+
 	if _, err := tmpfile.Write([]byte(content)); err != nil {
 		t.Fatalf("Failed to write to temp file: %v", err)
 	}
-	
+
 	if err := tmpfile.Close(); err != nil {
 		t.Fatalf("Failed to close temp file: %v", err)
 	}
-	
+
 	return tmpfile.Name()
 }
 
@@ -305,7 +306,7 @@ func TestMainHelp(t *testing.T) {
 
 	// Test --help flag
 	os.Args = []string{"llauncher", "--help"}
-	
+
 	// Since main() calls os.Exit(), we need to use a separate process
 	// This is a simplified test that just ensures the code compiles
 	if os.Getenv("TEST_MAIN_HELP") == "1" {
@@ -333,9 +334,9 @@ port: 8080
 		} else {
 			defer os.Unsetenv("LLAMA_CONFIG_PATH")
 		}
-		
+
 		os.Setenv("LLAMA_CONFIG_PATH", validFile)
-		
+
 		// This is a simplified test that just ensures the code compiles
 		// In a real scenario, we would need to mock exec.Command
 	})
@@ -344,9 +345,9 @@ port: 8080
 	t.Run("Config flag", func(t *testing.T) {
 		oldArgs := os.Args
 		defer func() { os.Args = oldArgs }()
-		
+
 		os.Args = []string{"llauncher", "--config", validFile}
-		
+
 		// This is a simplified test that just ensures the code compiles
 		// In a real scenario, we would need to mock exec.Command
 	})

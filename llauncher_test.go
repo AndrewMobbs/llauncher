@@ -18,7 +18,8 @@ n-gpu-layers: 0
 lora:
   - adapter1.bin
   - adapter2.bin
-verbose: true
+log-verbose: true
+ctx-size: 2048
 `
 	validFile := createTempFile(t, validYaml)
 	defer os.Remove(validFile)

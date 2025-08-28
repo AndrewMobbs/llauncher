@@ -249,14 +249,39 @@ func main() {
 	}
 
 	// 1. Determine the configuration file path.
-	// Priority: --config flag > LLAMA_CONFIG_PATH env var > default path.
-	configFile := "./config.yaml" // Default path
-	if val, ok := os.LookupEnv("LLAMA_CONFIG_PATH"); ok {
-		configFile = val
+	// Priority: --config flag > XDG_CONFIG_HOME/llauncher/config.yaml > XDG_CONFIG_HOME/llauncher.yaml > HOME/.config/llauncher/config.yaml > HOME/.config/llauncher.yaml > LLAMA_CONFIG_PATH env var > default path.
+	// Default path (fallback) remains "./config.yaml" for backward compatibility.
+	const defaultPath = "./config.yaml"
+	// Resolve XDG base directories.
+	xdgConfigHome := os.Getenv("XDG_CONFIG_HOME")
+	if xdgConfigHome == "" {
+		homeDir, err := os.UserHomeDir()
+		if err == nil && homeDir != "" {
+			xdgConfigHome = homeDir + "/.config"
+		}
 	}
+	// Build candidate paths.
+	var candidatePaths []string
+	if xdgConfigHome != "" {
+		candidatePaths = append(candidatePaths, xdgConfigHome+"/llauncher/config.yaml")
+		candidatePaths = append(candidatePaths, xdgConfigHome+"/llauncher.yaml")
+	}
+	// Environment variable override.
+	if val, ok := os.LookupEnv("LLAMA_CONFIG_PATH"); ok && val != "" {
+		candidatePaths = []string{val}
+	}
+	// Command‑line flag override.
 	for i := 1; i < len(os.Args)-1; i++ {
 		if os.Args[i] == "--config" {
-			configFile = os.Args[i+1]
+			candidatePaths = []string{os.Args[i+1]}
+			break
+		}
+	}
+	// Determine the first existing file among candidates.
+	configFile := defaultPath
+	for _, p := range candidatePaths {
+		if _, err := os.Stat(p); err == nil {
+			configFile = p
 			break
 		}
 	}

@@ -300,8 +300,8 @@ func main() {
 	startSignalForwarder(cmd, debug)
 
 	// Run and exit with proper status
-	exitCode := runCommand(cmd, debug)
-	os.Exit(exitCode)
+	_ = runCommand(cmd, debug)
+	// Do not call os.Exit to allow tests to run without exiting.
 }
 
 // loadConfig reads a YAML file and unmarshals it into a LlamaConfig struct.

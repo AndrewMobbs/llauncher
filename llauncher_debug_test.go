@@ -69,51 +69,68 @@ port: 8080
 
 // TestSignalHandling tests the signal handling functionality
 func TestSignalHandling(t *testing.T) {
-	// This test verifies that signals are forwarded to the child process.
-	// We use a mock command that blocks until it receives a SIGTERM.
-	// The mock is provided via the execCommand variable.
+	// Helper to capture and discard stdout/stderr.
+	captureOutput := func(f func()) {
+		devNull, _ := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+		origStdout := os.Stdout
+		origStderr := os.Stderr
+		os.Stdout = devNull
+		os.Stderr = devNull
+		defer func() {
+			os.Stdout = origStdout
+			os.Stderr = origStderr
+			_ = devNull.Close()
+		}()
+		f()
+	}
 
-	// Create a temporary config file (minimal, just model)
-	cfg := `
+	captureOutput(func() {
+		// This test verifies that signals are forwarded to the child process.
+		// We use a mock command that blocks until it receives a SIGTERM.
+		// The mock is provided via the execCommand variable.
+
+		// Create a temporary config file (minimal, just model)
+		cfg := `
 model: /tmp/dummy.gguf
 `
-	cfgFile := createTempFile(t, cfg)
-	defer os.Remove(cfgFile)
+		cfgFile := createTempFile(t, cfg)
+		defer os.Remove(cfgFile)
 
-	// Prepare a mock command that waits for a signal.
-	// The mock will be a separate Go test binary that exits with code 0
-	// when it receives SIGTERM.
-	mockCmd := func(name string, args ...string) *exec.Cmd {
-		// Use the same test binary with a special env var.
-		cmd := exec.Command(os.Args[0], "-test.run=MockSignalReceiver")
-		cmd.Env = append(os.Environ(), "MOCK_SIGNAL=1")
-		return cmd
-	}
-	originalExec := execCommand
-	execCommand = mockCmd
-	defer func() { execCommand = originalExec }()
+		// Prepare a mock command that waits for a signal.
+		// The mock will be a separate Go test binary that exits with code 0
+		// when it receives SIGTERM.
+		mockCmd := func(name string, args ...string) *exec.Cmd {
+			// Use the same test binary with a special env var.
+			cmd := exec.Command(os.Args[0], "-test.run=MockSignalReceiver")
+			cmd.Env = append(os.Environ(), "MOCK_SIGNAL=1")
+			return cmd
+		}
+		originalExec := execCommand
+		execCommand = mockCmd
+		defer func() { execCommand = originalExec }()
 
-	// Run main in a goroutine so we can send it a signal.
-	done := make(chan struct{})
-	go func() {
-		// Set args to include config file.
-		os.Args = []string{"llauncher", "--config", cfgFile}
-		main()
-		close(done)
-	}()
+		// Run main in a goroutine so we can send it a signal.
+		done := make(chan struct{})
+		go func() {
+			// Set args to include config file.
+			os.Args = []string{"llauncher", "--config", cfgFile}
+			main()
+			close(done)
+		}()
 
-	// Give the child process a moment to start.
-	time.Sleep(100 * time.Millisecond)
+		// Give the child process a moment to start.
+		time.Sleep(100 * time.Millisecond)
 
-	// Send SIGTERM to the current process; it should be forwarded.
-	syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+		// Send SIGTERM to the current process; it should be forwarded.
+		syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
 
-	// Wait for main to exit.
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-		t.Fatalf("main did not exit after signal")
-	}
+		// Wait for main to exit.
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatalf("main did not exit after signal")
+		}
+	})
 }
 
 // MockSignalReceiver is executed in a subprocess to act as the child process.

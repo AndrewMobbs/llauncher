@@ -295,6 +295,10 @@ func main() {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
+	// Run the child in its own process group so we can forward signals to it (and any
+	// subprocesses it may spawn) with a single kill call.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
 	// Forward signals
 	startSignalForwarder(cmd, debug)
 
@@ -373,21 +377,37 @@ func resolveConfigPath() string {
 	return configFile
 }
 
-// startSignalForwarder forwards SIGINT and SIGTERM to the child process.
-func startSignalForwarder(cmd *exec.Cmd, debug bool) {
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+ // startSignalForwarder forwards termination‑type signals to the child process
+ // (and any of its descendants). It listens for a broad set of signals that
+ // containers may receive and forwards each one to the child’s process group.
+ func startSignalForwarder(cmd *exec.Cmd, debug bool) {
+	 // Buffered channel so we don’t miss signals while the goroutine is starting.
+	 sigChan := make(chan os.Signal, 1)
 
-	go func() {
-		sig := <-sigChan
-		if debug {
-			fmt.Printf("Received signal: %v. Forwarding to llama-server...\n", sig)
-		}
-		if cmd.Process != nil {
-			cmd.Process.Signal(sig)
-		}
-	}()
-}
+	 // Signals we want to forward. SIGKILL and SIGSTOP cannot be caught, so they are omitted.
+	 signals := []os.Signal{
+		 syscall.SIGINT,
+		 syscall.SIGTERM,
+		 syscall.SIGQUIT,
+		 syscall.SIGHUP,
+		 syscall.SIGUSR1,
+		 syscall.SIGUSR2,
+	 }
+
+	 signal.Notify(sigChan, signals...)
+
+	 go func() {
+		 for sig := range sigChan {
+			 if debug {
+				 fmt.Printf("Received signal: %v. Forwarding to llama-server (pgid %d)...\n", sig, cmd.Process.Pid)
+			 }
+			 // Forward to the whole process group. Negative PID means “process group”.
+			 if err := syscall.Kill(-cmd.Process.Pid, sig.(syscall.Signal)); err != nil && debug {
+				 fmt.Printf("Failed to forward signal %v: %v\n", sig, err)
+			 }
+		 }
+	 }()
+ }
 
 // runCommand executes the command and returns an appropriate exit code.
 func runCommand(cmd *exec.Cmd, debug bool) int {

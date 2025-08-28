@@ -310,9 +310,9 @@ func TestMainHelp(t *testing.T) {
 	os.Args = []string{"llauncher", "--help"}
 
 	// Since main() calls os.Exit(), we need to run it in a subprocess.
-	// The subprocess will set TEST_MAIN_HELP=1 and invoke main().
-	cmd := exec.Command(os.Args[0], "-test.run=TestMainHelp")
-	cmd.Env = append(os.Environ(), "TEST_MAIN_HELP=1")
+	// Run the built llauncher binary with the help flag.
+	cmd := exec.Command("./llauncher", "--help")
+	cmd.Env = os.Environ()
 	// Suppress output; we only care about the exit code.
 	cmd.Stdout = nil
 	cmd.Stderr = nil

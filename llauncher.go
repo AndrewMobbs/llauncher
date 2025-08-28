@@ -234,131 +234,56 @@ func showHelp() {
 }
 
 func main() {
-	// Check if help is requested
-	if len(os.Args) > 1 && os.Args[1] == "--help" {
+	// Help flag
+	if isHelpRequested() {
 		showHelp()
 	}
 
-	// Check if debug mode is enabled
-	debugMode := false
-	for _, arg := range os.Args {
-		if arg == "--debug" {
-			debugMode = true
-			break
-		}
-	}
+	// Debug flag
+	debug := isDebugMode()
 
-	// 1. Determine the configuration file path.
-	// Priority: --config flag > XDG_CONFIG_HOME/llauncher/config.yaml > XDG_CONFIG_HOME/llauncher.yaml > HOME/.config/llauncher/config.yaml > HOME/.config/llauncher.yaml > LLAMA_CONFIG_PATH env var > default path.
-	// Default path (fallback) remains "./config.yaml" for backward compatibility.
-	const defaultPath = "./config.yaml"
-	// Resolve XDG base directories.
-	xdgConfigHome := os.Getenv("XDG_CONFIG_HOME")
-	if xdgConfigHome == "" {
-		homeDir, err := os.UserHomeDir()
-		if err == nil && homeDir != "" {
-			xdgConfigHome = homeDir + "/.config"
-		}
-	}
-	// Build candidate paths.
-	var candidatePaths []string
-	if xdgConfigHome != "" {
-		candidatePaths = append(candidatePaths, xdgConfigHome+"/llauncher/config.yaml")
-		candidatePaths = append(candidatePaths, xdgConfigHome+"/llauncher.yaml")
-	}
-	// Environment variable override.
-	if val, ok := os.LookupEnv("LLAMA_CONFIG_PATH"); ok && val != "" {
-		candidatePaths = []string{val}
-	}
-	// Command‑line flag override.
-	for i := 1; i < len(os.Args)-1; i++ {
-		if os.Args[i] == "--config" {
-			candidatePaths = []string{os.Args[i+1]}
-			break
-		}
-	}
-	// Determine the first existing file among candidates.
-	configFile := defaultPath
-	for _, p := range candidatePaths {
-		if _, err := os.Stat(p); err == nil {
-			configFile = p
-			break
-		}
-	}
-	if debugMode {
+	// Resolve configuration file path (XDG‑compliant)
+	configFile := resolveConfigPath()
+	if debug {
 		fmt.Printf("Loading configuration from: %s\n", configFile)
 	}
 
-	// 2. Read and parse the YAML configuration file.
+	// Load configuration
 	config, err := loadConfig(configFile)
 	if err != nil {
-		if debugMode {
+		if debug {
 			fmt.Printf("Failed to load configuration: %v\n", err)
 		}
 		showHelp()
 	}
 
-	// 3. Build the command-line arguments for llama-server using reflection.
+	// Build arguments for llama-server
 	args, err := buildArgs(config)
 	if err != nil {
-		if debugMode {
+		if debug {
 			fmt.Printf("Failed to build arguments: %v\n", err)
 		}
 		os.Exit(1)
 	}
 
-	// In debug mode, print the full command that will be executed
-	if debugMode {
+	// Debug output of the full command
+	if debug {
 		fmt.Printf("DEBUG: Configuration file: %s\n", configFile)
 		fmt.Println("DEBUG: Full command that will be executed:")
 		fmt.Printf("DEBUG: llama-server %s\n", formatArgsForDisplay(args))
 	}
 
-	// 4. Set up the command to execute llama-server.
-	// Assumes 'llama-server' is in the PATH.
-	// Use the injectable execCommand so tests can replace it.
+	// Prepare the command
 	cmd := execCommand("llama-server", args...)
-
-	// 5. Connect stdout and stderr of the child process to the parent.
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	// 6. Set up signal handling to forward signals to the child process.
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	// Forward signals
+	startSignalForwarder(cmd, debug)
 
-	go func() {
-		sig := <-sigChan
-		if debugMode {
-			fmt.Printf("Received signal: %v. Forwarding to llama-server...\n", sig)
-		}
-		if cmd.Process != nil {
-			cmd.Process.Signal(sig)
-		}
-	}()
-
-	// 7. Start and wait for the command to complete.
-	err = cmd.Run()
-
-	// 8. Handle the exit code.
-	if err != nil {
-		if exitError, ok := err.(*exec.ExitError); ok {
-			waitStatus := exitError.Sys().(syscall.WaitStatus)
-			if debugMode {
-				fmt.Printf("llama-server exited with status: %d\n", waitStatus.ExitStatus())
-			}
-			os.Exit(waitStatus.ExitStatus())
-		} else {
-			if debugMode {
-				fmt.Printf("Failed to run llama-server: %v\n", err)
-			}
-			os.Exit(1)
-		}
-	}
-
-	if debugMode {
-		fmt.Println("llama-server exited successfully.")
-	}
+	// Run and exit with proper status
+	exitCode := runCommand(cmd, debug)
+	os.Exit(exitCode)
 }
 
 // loadConfig reads a YAML file and unmarshals it into a LlamaConfig struct.
@@ -375,6 +300,98 @@ func loadConfig(path string) (*LlamaConfig, error) {
 	}
 
 	return &config, nil
+}
+
+// isHelpRequested returns true when the first argument is "--help".
+func isHelpRequested() bool {
+	return len(os.Args) > 1 && os.Args[1] == "--help"
+}
+
+// isDebugMode returns true when any argument equals "--debug".
+func isDebugMode() bool {
+	for _, a := range os.Args {
+		if a == "--debug" {
+			return true
+		}
+	}
+	return false
+}
+
+// resolveConfigPath determines the configuration file location following XDG rules
+// and respecting the LLAMA_CONFIG_PATH env var and the --config flag.
+func resolveConfigPath() string {
+	const defaultPath = "./config.yaml"
+
+	xdgConfigHome := os.Getenv("XDG_CONFIG_HOME")
+	if xdgConfigHome == "" {
+		if homeDir, err := os.UserHomeDir(); err == nil && homeDir != "" {
+			xdgConfigHome = homeDir + "/.config"
+		}
+	}
+
+	var candidatePaths []string
+	if xdgConfigHome != "" {
+		candidatePaths = append(candidatePaths, xdgConfigHome+"/llauncher/config.yaml")
+		candidatePaths = append(candidatePaths, xdgConfigHome+"/llauncher.yaml")
+	}
+
+	if val, ok := os.LookupEnv("LLAMA_CONFIG_PATH"); ok && val != "" {
+		candidatePaths = []string{val}
+	}
+
+	for i := 1; i < len(os.Args)-1; i++ {
+		if os.Args[i] == "--config" {
+			candidatePaths = []string{os.Args[i+1]}
+			break
+		}
+	}
+
+	configFile := defaultPath
+	for _, p := range candidatePaths {
+		if _, err := os.Stat(p); err == nil {
+			configFile = p
+			break
+		}
+	}
+	return configFile
+}
+
+// startSignalForwarder forwards SIGINT and SIGTERM to the child process.
+func startSignalForwarder(cmd *exec.Cmd, debug bool) {
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		sig := <-sigChan
+		if debug {
+			fmt.Printf("Received signal: %v. Forwarding to llama-server...\n", sig)
+		}
+		if cmd.Process != nil {
+			cmd.Process.Signal(sig)
+		}
+	}()
+}
+
+// runCommand executes the command and returns an appropriate exit code.
+func runCommand(cmd *exec.Cmd, debug bool) int {
+	err := cmd.Run()
+	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			waitStatus := exitError.Sys().(syscall.WaitStatus)
+			if debug {
+				fmt.Printf("llama-server exited with status: %d\n", waitStatus.ExitStatus())
+			}
+			return waitStatus.ExitStatus()
+		}
+		if debug {
+			fmt.Printf("Failed to run llama-server: %v\n", err)
+		}
+		return 1
+	}
+	if debug {
+		fmt.Println("llama-server exited successfully.")
+	}
+	return 0
 }
 
 // buildArgs uses reflection to dynamically build command-line arguments

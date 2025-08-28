@@ -247,13 +247,14 @@ func showHelp() {
 	fmt.Println("  --debug            Print debug information including the full command")
 	fmt.Println("\nEnvironment Variables:")
 	fmt.Println("  LLAMA_CONFIG_PATH  Path to YAML configuration file (overridden by --config)")
-	os.Exit(0)
+	// Removed os.Exit to allow graceful handling in tests.
 }
 
 func main() {
 	// Help flag
 	if isHelpRequested() {
 		showHelp()
+		return
 	}
 
 	// Debug flag

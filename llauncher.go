@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -145,7 +144,7 @@ type LlamaConfig struct {
 	LoraInitWithoutApply    bool     `yaml:"lora-init-without-apply" arg:"--lora-init-without-apply"`
 	ControlVector           []string `yaml:"control-vector" arg:"--control-vector"`
 	ControlVectorScaled     []string `yaml:"control-vector-scaled" arg:"--control-vector-scaled"`
-	ControlVectorLayerRange []string `yaml:"control-vector-layer-range" arg:"--control-vector-layer-range"`
+	ControlVectorLayerRange string   `yaml:"control-vector-layer-range" arg:"--control-vector-layer-range"`
 	MmProj                  string   `yaml:"mmproj" arg:"--mmproj"`
 	MmProjUrl               string   `yaml:"mmproj-url" arg:"--mmproj-url"`
 	NoMmProj                bool     `yaml:"no-mmproj" arg:"--no-mmproj"`
@@ -281,11 +280,9 @@ func main() {
 
 	// In debug mode, print the full command that will be executed
 	if debugMode {
-		fmt.Println("\n=== DEBUG MODE ===")
-		fmt.Printf("Configuration file: %s\n", configFile)
-		fmt.Println("Full command that will be executed:")
-		fmt.Printf("llama-server %s\n", formatArgsForDisplay(args))
-		fmt.Println("=================")
+		fmt.Printf("DEBUG: Configuration file: %s\n", configFile)
+		fmt.Println("DEBUG: Full command that will be executed:")
+		fmt.Printf("DEBUG: llama-server %s\n", formatArgsForDisplay(args))
 	}
 
 	// 4. Set up the command to execute llama-server.
@@ -336,7 +333,7 @@ func main() {
 
 // loadConfig reads a YAML file and unmarshals it into a LlamaConfig struct.
 func loadConfig(path string) (*LlamaConfig, error) {
-	yamlFile, err := ioutil.ReadFile(path)
+	yamlFile, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("could not read yaml file: %w", err)
 	}

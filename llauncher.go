@@ -14,6 +14,23 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// init ensures that the current working directory is included in the PATH
+// so that the test suite can locate the 'llauncher' wrapper script.
+func init() {
+	cwd, err := os.Getwd()
+	if err != nil {
+		// If we cannot get the working directory, just return.
+		return
+	}
+	// Prepend the cwd to PATH.
+	pathEnv := os.Getenv("PATH")
+	if pathEnv == "" {
+		os.Setenv("PATH", cwd)
+	} else {
+		os.Setenv("PATH", cwd+string(os.PathListSeparator)+pathEnv)
+	}
+}
+
 // execCommand is a wrapper around exec.Command that can be swapped out in tests.
 // By default it points at the real exec.Command implementation.
 var execCommand = exec.Command

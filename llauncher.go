@@ -256,6 +256,7 @@ func main() {
 			fmt.Printf("Failed to load configuration: %v\n", err)
 		}
 		showHelp()
+		os.Exit(1)
 	}
 
 	// Build arguments for llama-server
@@ -346,7 +347,12 @@ func resolveConfigPath() string {
 
 	for i := 1; i < len(os.Args)-1; i++ {
 		if os.Args[i] == "--config" {
-			candidatePaths = []string{os.Args[i+1]}
+			configFile := os.Args[i+1]
+			if _, err := os.Stat(configFile); err != nil {
+				fmt.Printf("Config file specified by --config not found: %s\n", configFile)
+				os.Exit(1)
+			}
+			candidatePaths = []string{configFile}
 			break
 		}
 	}
